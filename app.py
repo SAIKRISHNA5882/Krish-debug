@@ -10,7 +10,14 @@ st.markdown("Generate high-engagement scripts based on real-time news.")
 
 # --- SIDEBAR SETTINGS ---
 with st.sidebar:
-    st.header("Settings")
+    st.header("⚙️ Advanced Settings")
+    
+    # THIS IS THE ULTIMATE FIX: You can now change the model name without coding
+    model_id = st.text_input("Google Model ID", value="gemini-1.5-flash-latest", 
+                             help="If you get a 404 error, try: gemini-1.5-flash, gemini-1.5-pro, or gemini-pro")
+    
+    st.markdown("---")
+    st.header("📝 Script Settings")
     language = st.selectbox("Select Language", 
                             ["Telugu + English Mix", "Telugu", "Hindi", "English"])
     
@@ -53,10 +60,10 @@ def get_real_time_news(query):
     except Exception as e:
         return f"System Error: {str(e)}"
 
-# --- DIRECT GOOGLE AI CALL (THE PERMANENT FIX) ---
-def generate_ai_script(prompt):
-    # We call the API directly via URL to avoid library version errors
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+# --- DIRECT GOOGLE AI CALL (STABLE V1 VERSION) ---
+def generate_ai_script(prompt, chosen_model):
+    # Changed from v1beta to v1 for stability
+    url = f"https://generativelanguage.googleapis.com/v1/models/{chosen_model}:generateContent?key={GEMINI_API_KEY}"
     
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -71,7 +78,6 @@ def generate_ai_script(prompt):
             return f"AI Error: {response.status_code} - {response.text}"
         
         result_json = response.json()
-        # Extract the text from the Google AI response structure
         text = result_json['candidates'][0]['content']['parts'][0]['text']
         return text
     except Exception as e:
@@ -114,11 +120,12 @@ if st.button("Generate Viral Script"):
             - Ensure the script is video-ready and flows naturally.
             """
             
-            # 3. Generate using the Direct Call method
-            final_script = generate_ai_script(prompt)
+            # 3. Generate using the Direct Call method with the chosen Model ID
+            final_script = generate_ai_script(prompt, model_id)
             
             if "AI Error" in final_script or "AI Connection Error" in final_script:
                 st.error(final_script)
+                st.info("💡 Try changing the 'Google Model ID' in the sidebar to 'gemini-pro' or 'gemini-1.5-flash'.")
             else:
                 st.success("Done! Here is your viral script:")
                 st.markdown("---")

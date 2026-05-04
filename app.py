@@ -20,8 +20,7 @@ with st.sidebar:
     
     style = "Slightly formal news presenter, conversational, engaging, and viral."
 
-# --- API KEYS (Handled via Streamlit Secrets) ---
-# We use st.secrets so your keys stay hidden from the public
+# --- API KEYS ---
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     SERPER_API_KEY = st.secrets["SERPER_API_KEY"]
@@ -29,11 +28,11 @@ except:
     st.error("API Keys not found! Please add them to Streamlit Secrets.")
     st.stop()
 
-# Configure Gemini AI
+# Configure Gemini AI - UPDATED TO 1.5 FLASH
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# --- REAL-TIME SEARCH FUNCTION ---
+# --- REAL-TIME SEARCH FUNCTION (FIXED) ---
 def get_real_time_news(query):
     url = "https://google.serper.dev/search"
     payload = json.dumps({"q": query})
@@ -42,7 +41,15 @@ def get_real_time_news(query):
         'Content-Type': 'application/json'
     }
     response = requests.request("POST", url, headers=headers, data=payload)
-    return response.text
+    results = response.json()
+    
+    # This part cleans the news so the AI doesn't crash
+    organic_results = results.get('organic', [])
+    cleaned_text = ""
+    for item in organic_results:
+        cleaned_text += f"Title: {item.get('title')}\nSnippet: {item.get('snippet')}\nLink: {item.get('link')}\n\n"
+    
+    return cleaned_text
 
 # --- MAIN UI ---
 topic = st.text_input("Enter the Topic/News Event:", placeholder="e.g. Latest ISRO launch or Indian Political News")
@@ -52,36 +59,44 @@ if st.button("Generate Viral Script"):
         st.warning("Please enter a topic first!")
     else:
         with st.spinner("Searching real-time news and writing your viral script..."):
-            # 1. Fetch real-time data
-            raw_news = get_real_time_news(topic)
-            
-            # 2. The Prompt (The "Instructions" for the AI)
-            prompt = f"""
-            You are a viral Instagram Content Creator and News Expert. 
-            Use the following real-time search data: {raw_news}
-            
-            Create a video script for the topic: {topic}
-            Target Duration: {duration}
-            Language: {language}
-            Style: {style}
-            
-            STRICT STRUCTURE:
-            1. **THE HOOK (0-3 seconds):** Create a pattern-interrupting, shocking, or high-curiosity opening. Stop the scroll.
-            2. **THE VALUE (The Body):** Explain the news concisely. Use a problem-solution narrative. No jargon. Simple, conversational language.
-            3. **THE CTA (Call to Action):** A clear, engaging instruction for the viewer (e.g., 'Comment your thoughts below').
-            
-            ADDITIONAL REQUIREMENTS:
-            - If language is 'Telugu + English Mix', write it in natural 'Tanglish' (the way young people speak in cities).
-            - Provide a separate section titled 'PROOFS & IMAGE LINKS' containing the URLs from the search data that the user can use for b-roll or evidence.
-            - Ensure the script is video-ready and flows naturally.
-            """
-            
-            # 3. Generate the content
-            response = model.generate_content(prompt)
-            
-            # 4. Display the result
-            st.success("Done! Here is your viral script:")
-            st.markdown("---")
-            st.markdown(response.text)
-            st.markdown("---")
+            try:
+                # 1. Fetch cleaned real-time data
+                cleaned_news = get_real_time_news(topic)
+                
+                if not cleaned_news:
+                    st.error("No news found for this topic. Try a different keyword.")
+                    st.stop()
 
+                # 2. The Prompt
+                prompt = f"""
+                You are a viral Instagram Content Creator and News Expert. 
+                Use the following real-time search data: 
+                {cleaned_news}
+                
+                Create a video script for the topic: {topic}
+                Target Duration: {duration}
+                Language: {language}
+                Style: {style}
+                
+                STRICT STRUCTURE:
+                1. **THE HOOK (0-3 seconds):** Create a pattern-interrupting, shocking, or high-curiosity opening. Stop the scroll.
+                2. **THE VALUE (The Body):** Explain the news concisely. Use a problem-solution narrative. No jargon. Simple, conversational language.
+                3. **THE CTA (Call to Action):** A clear, engaging instruction for the viewer (e.g., 'Comment your thoughts below').
+                
+                ADDITIONAL REQUIREMENTS:
+                - If language is 'Telugu + English Mix', write it in natural 'Tanglish' (the way young people speak in cities).
+                - Provide a separate section titled 'PROOFS & IMAGE LINKS' containing the URLs from the search data.
+                - Ensure the script is video-ready and flows naturally.
+                """
+                
+                # 3. Generate the content
+                response = model.generate_content(prompt)
+                
+                # 4. Display the result
+                st.success("Done! Here is your viral script:")
+                st.markdown("---")
+                st.markdown(response.text)
+                st.markdown("---")
+                
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
